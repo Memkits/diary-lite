@@ -762,7 +762,7 @@
                       (:ok data)
                         let
                             object $ contract/expect-object |options data
-                          reset! *options $ foldl ([] |food |sleep |place |exercise |pains) @*options $ fn (acc key)
+                          reset! *options $ foldl ([] |food |place |exercise |pains) @*options $ fn (acc key)
                             assoc acc key $ decode-strings $ contract/object-field |options object key
                           , &unit
                       (:err error) (raise error)
@@ -862,6 +862,27 @@
             println |Diary-Lite-started
           :examples $ []
           :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+        'merge-options $ %{} 'CodeEntry
+          :doc "|Most used values first; presets only fill the remaining places, so they drop out as real usage grows."
+          :code $ quote $ defn merge-options (used presets limit)
+            let
+                merged $ &list:distinct $ concat used presets
+              &list:slice merged 0 $ if
+                > (count merged) limit
+                , limit $ count merged
+          :examples $ []
+          :schema $ quote $ Fn (List String) (List String) Number
+            -> $ List String
+          :tests $ [] $ %{} 'TestEntry (:name |usage-replaces-presets)
+            :code $ quote $ do
+              assert= ([] |p |q |r)
+                merge-options ([]) ([] |p |q |r) 3
+              assert= ([] |a |p |q)
+                merge-options ([] |a) ([] |p |q |r) 3
+              assert= ([] |q |p |r)
+                merge-options ([] |q) ([] |p |q |r) 3
+              assert= ([] |a |b |c)
+                merge-options ([] |a |b |c |d) ([] |p |q) 3
         'monday-index $ %{} 'CodeEntry
           :doc "|Column of a date in a Monday-first week, 0 to 6."
           :code $ quote $ defn monday-index (year month day)
@@ -1033,8 +1054,6 @@
             cond
                 = key |food
                 [] "|米饭" "|面条" "|粥" "|鸡蛋" "|牛奶" "|蔬菜" "|水果" "|肉" "|鱼" "|面包" "|咖啡" "|外卖"
-              (= key |sleep)
-                [] "|早睡" "|晚睡" "|熬夜" "|睡得好" "|睡得差" "|多梦" "|午睡" "|失眠" "|早醒"
               (= key |place)
                 [] "|家" "|公司" "|商场" "|公园" "|餐厅" "|咖啡馆" "|健身房" "|医院" "|出差"
               (= key |exercise)
@@ -1045,21 +1064,23 @@
           :examples $ []
           :schema $ quote $ Fn String
             -> $ List String
+        'quick-option-limit $ %{} 'CodeEntry
+          :doc "|How many suggested values a tag shows; values recorded on the visible day come on top of this."
+          :code $ quote $ def quick-option-limit 12
+          :examples $ []
+          :schema $ quote Number
         'quick-options $ %{} 'CodeEntry
-          :doc "|Used values first, then presets, capped; values recorded on this day always stay visible so they can be toggled off."
+          :doc "|Suggestions from usage and presets; values recorded on this day always stay visible so they can be toggled off."
           :code $ quote $ defn quick-options (key)
             let
                 used $ option:unwrap-or (&map:get @*options key)
                   assert-type ([]) (List String)
-                merged $ &list:distinct $ concat used (preset-options key)
-                capped $ &list:slice merged 0 $ if
-                  > (count merged) 24
-                  , 24 (count merged)
+                suggested $ merge-options used (preset-options key) quick-option-limit
                 recorded $ &list:filter
                   &list:map (entries-of key)
                     fn (entry) (:content entry)
                   , short-value?
-              &list:distinct $ concat capped recorded
+              &list:distinct $ concat suggested recorded
           :examples $ []
           :schema $ quote $ Fn String
             -> $ List String
@@ -1810,13 +1831,14 @@
         'tag-field? $ %{} 'CodeEntry
           :doc "|Tags holding enumerable values; the others stay free text."
           :code $ quote $ defn tag-field? (key)
-            &list:includes? ([] |food |sleep |place |exercise |pains) key
+            &list:includes? ([] |food |place |exercise |pains) key
           :examples $ []
           :schema $ quote $ Fn String (-> Bool)
           :tests $ [] $ %{} 'TestEntry (:name |only-enumerable-tags)
             :code $ quote $ do
               assert= true $ tag-field? |pains
               assert= false $ tag-field? |mood
+              assert= false $ tag-field? |sleep
               assert= false $ tag-field? |text
         'tap-guard! $ %{} 'CodeEntry
           :doc "|Runs a tap action unless the gesture that produced this click was a swipe."

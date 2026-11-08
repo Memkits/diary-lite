@@ -88,7 +88,7 @@ pub const FIELDS: [&str; 9] = [
 ];
 
 /// Tags recorded as short enumerable values, offered back as quick options.
-pub const TAG_FIELDS: [&str; 5] = ["food", "sleep", "place", "exercise", "pains"];
+pub const TAG_FIELDS: [&str; 4] = ["food", "place", "exercise", "pains"];
 const MAX_OPTION_CHARS: usize = 16;
 const MAX_OPTIONS_PER_FIELD: usize = 24;
 
@@ -948,7 +948,8 @@ mod tests {
         let options: BTreeMap<String, Vec<String>> = serde_json::from_slice(&body).unwrap();
         assert_eq!(options["exercise"], vec!["游泳", "跑步"]);
         assert_eq!(options["food"], vec!["面条"]);
-        assert!(options["sleep"].is_empty());
+        assert!(options["place"].is_empty());
+        assert!(!options.contains_key("sleep"));
         assert!(!options.contains_key("mood"));
 
         let (_, body) = send(service.clone(), Method::GET, "/api/options", &bob, None).await;
