@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x86_64:
+    name: Linux x86_64 binary
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.0
+      - uses: dtolnay/rust-toolchain@1.94.0
+      - name: Build release binary
+        run: cargo build --locked --release --bin diary-lite
+      - name: Package binary
+        run: |
+          mkdir -p release
+          strip target/release/diary-lite
+          tar -C target/release -czf release/diary-lite-linux-x86_64.tar.gz diary-lite
+          sha256sum release/diary-lite-linux-x86_64.tar.gz > release/diary-lite-linux-x86_64.tar.gz.sha256
+          file target/release/diary-lite
+          ldd target/release/diary-lite
+      - name: Configure deploy key
+        env:
+          DEPLOY_KEY: ${{ secrets.rsync_private_key_tc }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/diary-ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/diary-ssh/key"
+          chmod 600 "$RUNNER_TEMP/diary-ssh/key"
+      - name: Prepare deployment directories
+        run: |
+          ssh -i "$RUNNER_TEMP/diary-ssh/key" \
+            -o StrictHostKeyChecking=accept-new \
+            rsync-user@chenyong.life \
+            'mkdir -p /servers/diary-lite'
+      - name: Upload binary to deployment server
+        run: |
+          rsync -avz --progress \
+            -e "ssh -i $RUNNER_TEMP/diary-ssh/key -o StrictHostKeyChecking=accept-new" \
+            release/ \
+            rsync-user@chenyong.life:/servers/diary-lite/
+      - name: Publish GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_args=(--generate-notes --title "Diary Lite ${GITHUB_REF_NAME}")
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            release_args+=(--prerelease)
+          fi
+          gh release create "${GITHUB_REF_NAME}" release/* "${release_args[@]}"
+
+  frontend:
+    name: Frontend assets
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.1.0
+        with:
+          node-version: 24
+      - name: Enable Yarn
+        run: |
+          corepack enable
+          corepack prepare yarn@4.18.0 --activate
+      - uses: calcit-lang/setup-calcit@ca701be5a471759e442aa053cd100720bbe1f09f # v1.5.0
+        with:
+          tools: calcit,caps
+      - name: Build frontend
+        run: |
+          caps --ci
+          yarn install --immutable
+          caps verify --toolchain
+          test "$(calcit --version)" = "0.35.1"
+          yarn check
+          yarn compile
+          yarn build
+      - name: Configure deploy key
+        env:
+          DEPLOY_KEY: ${{ secrets.rsync_private_key_tc }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/diary-ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/diary-ssh/key"
+          chmod 600 "$RUNNER_TEMP/diary-ssh/key"
+      - name: Upload frontend to deployment server
+        run: |
+          ssh -i "$RUNNER_TEMP/diary-ssh/key" \
+            -o StrictHostKeyChecking=accept-new \
+            rsync-user@chenyong.life \
+            'mkdir -p /web-assets/repo/Memkits/diary-lite'
+          rsync -avz --delete --progress \
+            -e "ssh -i $RUNNER_TEMP/diary-ssh/key -o StrictHostKeyChecking=accept-new" \
+            dist/ \
+            rsync-user@chenyong.life:/web-assets/repo/Memkits/diary-lite/

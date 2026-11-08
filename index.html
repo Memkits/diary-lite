@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Diary Lite</title>
+    <link href="https://cdn.tiye.me/logo/topix.png" rel="icon" type="image/png" />
+    <link rel="stylesheet" href="/assets/main.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section class="shell">
+        <header>
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true"><span></span><span></span></span>
+            <h1>Diary <span>Lite</span></h1>
+          </div>
+          <span id="status" class="status">连接中</span>
+        </header>
+        <section id="login-panel" class="login-panel">
+          <span class="section-kicker">PRIVATE DIARY</span>
+          <h2>一天一页，<br />点一下就记。</h2>
+          <p>登录后按标签记录饮食、睡眠、心情和正文。内容只对你可见。</p>
+          <form id="login-form">
+            <label for="username">用户名</label>
+            <input id="username" autocomplete="username" placeholder="输入用户名" required />
+            <label for="password">密码</label>
+            <input id="password" type="password" autocomplete="current-password" placeholder="输入密码" required />
+            <button type="submit">登录</button>
+          </form>
+        </section>
+        <section id="board" hidden>
+          <div class="user-bar">
+            <span class="account-label"><span class="account-avatar" aria-hidden="true">●</span><strong id="current-user"></strong></span>
+            <button id="logout" class="icon-button" type="button" aria-label="退出登录" title="退出登录">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M9 12h9m-3-3 3 3-3 3" /></svg>
+            </button>
+          </div>
+          <nav class="day-bar" aria-label="切换日期">
+            <button id="prev-day" class="icon-button" type="button" aria-label="前一天" title="前一天">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+            </button>
+            <div class="day-heading">
+              <h2 id="day-title"></h2>
+              <span id="day-progress"></span>
+            </div>
+            <button id="next-day" class="icon-button" type="button" aria-label="后一天" title="后一天">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+            </button>
+            <button id="today" class="text-button" type="button">今天</button>
+          </nav>
+          <div id="tags" class="tags"></div>
+          <section id="detail" class="detail" hidden aria-live="polite">
+            <div class="detail-head">
+              <div>
+                <h2 id="detail-title"></h2>
+                <p id="detail-hint"></p>
+              </div>
+              <button id="detail-close" class="icon-button" type="button" aria-label="收起" title="收起 (Esc)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+              </button>
+            </div>
+            <div id="entry-list" class="entry-list"></div>
+            <form id="entry-form">
+              <label class="sr-only" for="entry-content">记录内容</label>
+              <textarea id="entry-content" rows="3"></textarea>
+              <div class="composer-actions">
+                <span>⌘ / Ctrl + Enter 提交 · Esc 取消</span>
+                <span class="composer-buttons">
+                  <button id="entry-cancel" class="secondary" type="button" hidden>取消</button>
+                  <button id="entry-submit" type="submit">记录</button>
+                </span>
+              </div>
+            </form>
+          </section>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/client.mjs"></script>
+  </body>
+</html>

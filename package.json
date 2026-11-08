@@ -1,0 +1,16 @@
+{
+  "name": "diary-lite-web",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "yarn@4.18.0",
+  "scripts": {
+    "check": "calcit --check-only",
+    "compile": "calcit js",
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@calcit/procs": "0.35.1",
+    "vite": "6.1.0"
+  }
+}

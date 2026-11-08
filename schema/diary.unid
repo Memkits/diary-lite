@@ -1,0 +1,16 @@
+struct Entry {
+  id: int
+  owner: text
+  date: text
+  field: text
+  content: text
+  created_at: int
+  updated_at: int
+}
+
+table entries: Entry {
+  key id
+}
+
+create index entries (owner)
+create index entries (date)
