@@ -184,7 +184,7 @@
                 local-host? $ or (= hostname |localhost) (= hostname |127.0.0.1)
               if
                 and local-host? $ not= environment |prod
-                , |http://127.0.0.1:11031 |https://diary.chenyong.life
+                , |http://127.0.0.1:11031 |https://diary-lite.chenyong.life
           :examples $ []
           :schema $ quote String
         'api-request! $ %{} 'CodeEntry

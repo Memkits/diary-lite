@@ -69,4 +69,4 @@ calcit test app.diary --require-match
 
 后端测试覆盖登录与配置校验、同一标签多条记录、编辑与删除、日期与字段校验、用户隔离、重开数据库后的持久化和 schema 漂移拒绝；Calcit 测试覆盖日期计算、路由解析和每天的状态分类。
 
-部署方式与 copyboard-lite 相同，见 [部署建议](docs/DEPLOYMENT.md)。
+生产地址是 `https://diary-lite.chenyong.life`，Caddy 配置在 `deploy/Caddyfile.diary-lite.chenyong.life`。部署方式与 copyboard-lite 相同，见 [部署建议](docs/DEPLOYMENT.md)。
