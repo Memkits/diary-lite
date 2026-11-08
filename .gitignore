@@ -8,3 +8,4 @@
 /.pnp.*
 /.calcit-error.cirru
 .DS_Store
+.env

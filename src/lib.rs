@@ -36,6 +36,12 @@ unionid_query::queries! {
         select {date, field}
     }
 
+    query list_values_query {
+        from entries
+        filter owner == $owner
+        select {field, content, created_at}
+    }
+
     query latest_entry_query {
         from entries
         sort -id
@@ -80,6 +86,11 @@ pub const FIELDS: [&str; 9] = [
     "pains",
     "text",
 ];
+
+/// Tags recorded as short enumerable values, offered back as quick options.
+pub const TAG_FIELDS: [&str; 5] = ["food", "sleep", "place", "exercise", "pains"];
+const MAX_OPTION_CHARS: usize = 16;
+const MAX_OPTIONS_PER_FIELD: usize = 24;
 
 const TOKEN_TTL_SECONDS: i64 = 3 * 24 * 60 * 60;
 const SESSION_COOKIE_NAME: &str = "diary_session";
@@ -229,6 +240,7 @@ pub fn app_with_auth(
             put(update_entry).delete(delete_entry).options(preflight),
         )
         .route("/api/days", get(list_range).options(preflight))
+        .route("/api/options", get(list_options).options(preflight))
         .layer(middleware::from_fn(cors))
         .with_state(state))
 }
@@ -328,6 +340,55 @@ async fn list_range(
         Json(summaries).into_response(),
         &session.token,
     ))
+}
+
+/// Values used before in each tag field, most used first, then most recently used.
+async fn list_options(State(state): State<AppState>, headers: HeaderMap) -> ApiResult {
+    let session = authorize(&headers, &state)?;
+    let mut engine = state.engine.lock().await;
+    let rows = list_values_query::list_values_query(
+        &mut engine,
+        list_values_query::ListValuesQueryParams {
+            owner: session.username.clone(),
+        },
+    )
+    .map_err(internal_error)?;
+    let mut usage: BTreeMap<String, BTreeMap<String, (usize, i64)>> = TAG_FIELDS
+        .iter()
+        .map(|field| ((*field).to_owned(), BTreeMap::new()))
+        .collect();
+    for row in rows {
+        if !is_option_value(&row.content) {
+            continue;
+        }
+        if let Some(values) = usage.get_mut(&row.field) {
+            let used = values.entry(row.content).or_default();
+            used.0 += 1;
+            used.1 = used.1.max(row.created_at);
+        }
+    }
+    let options: BTreeMap<String, Vec<String>> = usage
+        .into_iter()
+        .map(|(field, values)| {
+            let mut values: Vec<(String, (usize, i64))> = values.into_iter().collect();
+            values.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+            let names = values
+                .into_iter()
+                .take(MAX_OPTIONS_PER_FIELD)
+                .map(|(name, _)| name)
+                .collect();
+            (field, names)
+        })
+        .collect();
+    Ok(with_session(Json(options).into_response(), &session.token))
+}
+
+/// Longer free text recorded in a tag field stays an entry but is not offered as an option.
+fn is_option_value(content: &str) -> bool {
+    content.chars().count() <= MAX_OPTION_CHARS
+        && !content
+            .chars()
+            .any(|ch| ch.is_whitespace() || matches!(ch, ',' | '，' | '、'))
 }
 
 async fn create_entry(
@@ -861,6 +922,45 @@ mod tests {
             ]
         );
 
+        drop(service);
+        let _ = std::fs::remove_file(database);
+    }
+
+    #[tokio::test]
+    async fn options_list_used_values_by_frequency_per_owner() {
+        let database = temp_database("options");
+        let service = service(&database);
+        let alice = login_as(service.clone(), "alice", "alice-pass").await;
+        let bob = login_as(service.clone(), "bob", "bob-pass").await;
+        for (field, content) in [
+            ("exercise", "跑步"),
+            ("exercise", "游泳"),
+            ("exercise", "游泳"),
+            ("exercise", "下午和朋友 打了两小时球"),
+            ("food", "面条"),
+            ("mood", "开心"),
+        ] {
+            create(service.clone(), &alice, "2026-11-08", field, content).await;
+        }
+
+        let (status, body) = send(service.clone(), Method::GET, "/api/options", &alice, None).await;
+        assert_eq!(status, StatusCode::OK);
+        let options: BTreeMap<String, Vec<String>> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(options["exercise"], vec!["游泳", "跑步"]);
+        assert_eq!(options["food"], vec!["面条"]);
+        assert!(options["sleep"].is_empty());
+        assert!(!options.contains_key("mood"));
+
+        let (_, body) = send(service.clone(), Method::GET, "/api/options", &bob, None).await;
+        let options: BTreeMap<String, Vec<String>> = serde_json::from_slice(&body).unwrap();
+        assert!(options["exercise"].is_empty());
+
+        let anonymous = service
+            .clone()
+            .oneshot(Request::get("/api/options").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
         drop(service);
         let _ = std::fs::remove_file(database);
     }

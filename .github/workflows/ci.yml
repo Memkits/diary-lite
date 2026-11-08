@@ -53,7 +53,7 @@ jobs:
           caps --ci
           yarn install --immutable
           caps verify --toolchain
-          test "$(calcit --version)" = "0.35.1"
+          test "$(calcit --version)" = "0.38.0"
           calcit edit format
           git diff --exit-code -- calcit.cirru
           calcit fix --workflow strict --verify --format edn

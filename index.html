@@ -2,8 +2,8 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#fbf7ef" />
     <title>Diary Lite</title>
     <link href="https://cdn.tiye.me/logo/topix.png" rel="icon" type="image/png" />
     <link rel="stylesheet" href="/assets/main.css" />
@@ -21,7 +21,7 @@
         <section id="login-panel" class="login-panel">
           <span class="section-kicker">PRIVATE DIARY</span>
           <h2>一天一页，<br />点一下就记。</h2>
-          <p>登录后按标签记录饮食、睡眠、心情和正文。内容只对你可见。</p>
+          <p>登录后按标签记录食物、睡眠、心情和正文。内容只对你可见。</p>
           <form id="login-form">
             <label for="username">用户名</label>
             <input id="username" autocomplete="username" placeholder="输入用户名" required />
@@ -31,27 +31,97 @@
           </form>
         </section>
         <section id="board" hidden>
-          <div class="user-bar">
-            <span class="account-label"><span class="account-avatar" aria-hidden="true">●</span><strong id="current-user"></strong></span>
-            <button id="logout" class="icon-button" type="button" aria-label="退出登录" title="退出登录">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M9 12h9m-3-3 3 3-3 3" /></svg>
-            </button>
-          </div>
-          <nav class="day-bar" aria-label="切换日期">
-            <button id="prev-day" class="icon-button" type="button" aria-label="前一天" title="前一天">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
-            </button>
-            <div class="day-heading">
-              <h2 id="day-title"></h2>
-              <span id="day-progress"></span>
+          <section id="view-day" class="view">
+            <nav class="day-bar" aria-label="切换日期">
+              <div class="day-heading">
+                <h2 id="day-title"></h2>
+                <span id="day-progress"></span>
+              </div>
+              <button id="prev-day" class="icon-button" type="button" aria-label="前一天" title="前一天">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+              </button>
+              <button id="next-day" class="icon-button" type="button" aria-label="后一天" title="后一天">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+              </button>
+              <button id="today" class="text-button" type="button">今天</button>
+            </nav>
+            <div id="tags" class="tags swipeable"></div>
+          </section>
+
+          <section id="view-calendar" class="view" hidden>
+            <nav class="day-bar" aria-label="切换月份">
+              <div class="day-heading">
+                <h2 id="cal-title"></h2>
+              </div>
+              <button id="prev-month" class="icon-button" type="button" aria-label="上个月" title="上个月">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+              </button>
+              <button id="next-month" class="icon-button" type="button" aria-label="下个月" title="下个月">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+              </button>
+              <button id="this-month" class="text-button" type="button">本月</button>
+            </nav>
+            <div class="legend">
+              <span><i class="swatch complete"></i>完整 <strong id="count-complete">0</strong></span>
+              <span><i class="swatch partial"></i>缺条目 <strong id="count-partial">0</strong></span>
+              <span><i class="swatch none"></i>完全没写 <strong id="count-none">0</strong></span>
             </div>
-            <button id="next-day" class="icon-button" type="button" aria-label="后一天" title="后一天">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+            <div class="cal-weekdays" aria-hidden="true">
+              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div id="cal-grid" class="cal-grid swipeable"></div>
+            <section id="cal-panel" class="cal-panel" hidden>
+              <div class="cal-panel-head">
+                <div>
+                  <h3 id="cal-panel-title"></h3>
+                  <p id="cal-panel-summary"></p>
+                </div>
+                <button id="cal-open-day" class="text-button" type="button">打开这天</button>
+              </div>
+              <div id="cal-chips" class="chips"></div>
+            </section>
+          </section>
+
+          <section id="view-me" class="view" hidden>
+            <div class="stats">
+              <div class="stat"><strong id="stat-streak">0</strong><span>连续记录（天）</span></div>
+              <div class="stat"><strong id="stat-written">0</strong><span>近一年写过（天）</span></div>
+              <div class="stat"><strong id="stat-complete">0</strong><span>近一年完整（天）</span></div>
+            </div>
+            <div class="account-row">
+              <span>当前账号</span>
+              <strong id="current-user"></strong>
+            </div>
+            <button id="logout" class="secondary logout" type="button">退出登录</button>
+          </section>
+
+          <nav class="tabbar" aria-label="主导航">
+            <button id="tab-day" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 9h6M9 13h6" /></svg>
+              <span>记录</span>
             </button>
-            <button id="today" class="text-button" type="button">今天</button>
+            <button id="tab-calendar" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5" /></svg>
+              <span>日历</span>
+            </button>
+            <button id="tab-me" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM5 20a7 7 0 0 1 14 0" /></svg>
+              <span>我的</span>
+            </button>
           </nav>
-          <div id="tags" class="tags"></div>
-          <section id="detail" class="detail" hidden aria-live="polite">
+
+          <div id="sheet-backdrop" class="sheet-backdrop"></div>
+          <section id="detail" class="detail" aria-label="记录内容">
+            <div id="detail-empty" class="detail-empty">
+              <h2>点一个标签开始记录</h2>
+              <ul>
+                <li><kbd>1</kbd>–<kbd>9</kbd> 打开对应标签</li>
+                <li><kbd>←</kbd> <kbd>→</kbd> 切换日期</li>
+                <li><kbd>⌘</kbd> <kbd>Enter</kbd> 提交，<kbd>Esc</kbd> 收起</li>
+                <li>没提交的内容会自动存为草稿</li>
+              </ul>
+            </div>
+            <button id="sheet-handle" class="sheet-handle" type="button" aria-label="收起"><span></span></button>
             <div class="detail-head">
               <div>
                 <h2 id="detail-title"></h2>
@@ -61,10 +131,11 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
               </button>
             </div>
+            <div id="quick-chips" class="quick-chips" hidden></div>
             <div id="entry-list" class="entry-list"></div>
             <form id="entry-form">
               <label class="sr-only" for="entry-content">记录内容</label>
-              <textarea id="entry-content" rows="3"></textarea>
+              <textarea id="entry-content" rows="2"></textarea>
               <div class="composer-actions">
                 <span>⌘ / Ctrl + Enter 提交 · Esc 取消</span>
                 <span class="composer-buttons">
