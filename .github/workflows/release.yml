@@ -74,7 +74,7 @@ jobs:
           caps --ci
           yarn install --immutable
           caps verify --toolchain
-          test "$(calcit --version)" = "0.38.0"
+          test "$(calcit --version)" = "0.42.1"
           yarn check
           yarn compile
           yarn build

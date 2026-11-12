@@ -41,12 +41,12 @@
         '*entries $ %{} 'CodeEntry (:doc "|Entries of the visible day, oldest first.")
           :code $ quote $ defref *entries ([])
           :examples $ []
-          :schema $ quote $ Ref (List app.diary/DiaryEntry)
+          :schema $ quote $ Ref (List DiaryEntry)
         '*month $ %{} 'CodeEntry (:doc "|Month shown by the calendar page.")
           :code $ quote $ defref *month
             month-of-key $ day-key $ today-noon-ms
           :examples $ []
-          :schema $ quote $ Ref app.diary/YearMonth
+          :schema $ quote $ Ref YearMonth
         '*options $ %{} 'CodeEntry
           :doc "|Values used before, by tag key, from /api/options."
           :code $ quote $ defref *options
@@ -68,9 +68,9 @@
         '*queue $ %{} 'CodeEntry
           :doc "|Tag changes waiting to be saved, applied one at a time so quick taps cannot race."
           :code $ quote $ defref *queue
-            assert-type ([]) (List app.diary/QueueItem)
+            assert-type ([]) (List QueueItem)
           :examples $ []
-          :schema $ quote $ Ref (List app.diary/QueueItem)
+          :schema $ quote $ Ref (List QueueItem)
         '*queue-running $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defref *queue-running false
           :examples $ []
@@ -169,7 +169,7 @@
                 floor $ / total 12
                 , :month $ + 1 $ floor-mod total 12
           :examples $ []
-          :schema $ quote $ Fn app.diary/YearMonth Number (-> app.diary/YearMonth)
+          :schema $ quote $ Fn YearMonth Number (-> YearMonth)
           :tests $ [] $ %{} 'TestEntry (:name |wraps-across-years)
             :code $ quote $ do
               assert= |2027-01 $ month-key $ add-months (YearMonth :year 2026 :month 12) 1
@@ -180,7 +180,9 @@
                 location $ browser/location-snapshot
                 hostname $ location :hostname
                 query $ shared/search-params-create $ location :search
-                environment $ option:unwrap-or (shared/search-params-get query |env) |
+                environment $
+                  shared/search-params-get query |env
+                  , .unwrap-or |
                 local-host? $ or (= hostname |localhost) (= hostname |127.0.0.1)
               if
                 and local-host? $ not= environment |prod
@@ -199,7 +201,7 @@
                     , response
                 (:err error) (raise error)
           :examples $ []
-          :schema $ quote $ Fn String js-ffi.shared/HttpMethod (Option String) (-> js-ffi.shared/ResponseHost) (:features :js-ffi) (:async)
+          :schema $ quote $ Fn String shared/HttpMethod (Option String) (-> shared/ResponseHost) (:features :js-ffi) (:async)
         'apply-queue-item! $ %{} 'CodeEntry
           :doc "|Saves one change and reports success. Removing a value not on screen is a no-op."
           :code $ quote $ defn apply-queue-item! (item) (hint-fn Async)
@@ -207,7 +209,7 @@
               if (:add? item)
                 let
                     response $ js-await $ api-request! |/api/entries (%:: shared/HttpMethod :post)
-                      Option :some $ contract/expect-string |body $ js/JSON.stringify
+                      Some $ contract/expect-string |body $ js/JSON.stringify
                         js-object
                           :date $ :date item
                           :field $ :field item
@@ -225,19 +227,19 @@
                         entries-of $ :field item
                         fn (entry)
                           = (:value item) (:content entry)
-                      assert-type ([]) (List app.diary/DiaryEntry)
+                      assert-type ([]) (List DiaryEntry)
                   if (empty? matches) true $ let
                       response $ js-await $ api-request!
                         str |/api/entries/ $ :id $ &list:nth matches 0
                         %:: shared/HttpMethod :delete
-                        Option :none
+                        , None
                     when
                       not $ response :ok?
                       handle-failure! (response :status) "|删除失败"
                     response :ok?
               fn (error) (shared/console-error! |Failed-to-save-tag) (set-status! "|保存失败" |error) false
           :examples $ []
-          :schema $ quote $ Fn app.diary/QueueItem (-> Bool) (:features :js-ffi) (:async)
+          :schema $ quote $ Fn QueueItem (-> Bool) (:features :js-ffi :state) (:async)
         'apply-route! $ %{} 'CodeEntry
           :doc "|Moves application state to the location hash, animates what changed and loads data that is not on screen yet."
           :code $ quote $ defn apply-route! (load?)
@@ -292,30 +294,32 @@
                   , |slide-next |slide-prev
               when
                 and load? (or view-changed? day-changed? month-changed?)
-                  option:some? $ get-token
+                  .some? $ get-token
                 load-current!
               , &unit
           :examples $ []
-          :schema $ quote $ Fn Bool (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn Bool (-> Unit) (:features :js-ffi :state)
         'auth-headers $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn auth-headers ()
             let
-                token $ option:unwrap-or (get-token) |
+                token $
+                  get-token
+                  , .unwrap-or |
                 headers $ shared/headers-create
               shared/headers-set! headers |Content-Type |application/json
               shared/headers-set! headers |Authorization $ str "|Bearer " token
               , headers
           :examples $ []
-          :schema $ quote $ Fn (-> js-ffi.shared/HeadersHost) (:features :js-ffi)
+          :schema $ quote $ Fn (-> shared/HeadersHost) (:features :js-ffi)
         'by-id $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn by-id (selector)
-            option:unwrap $ browser/query-selector selector
+            (browser/query-selector selector) .unwrap
           :examples $ []
-          :schema $ quote $ Fn String (-> js-ffi.browser/DomElementHost) (:features :js-ffi)
+          :schema $ quote $ Fn String (-> browser/DomElementHost) (:features :js-ffi)
         'cancel-edit! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn cancel-edit! () (reset! *editing 0) (load-composer!) (render!)
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'clock-label $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn clock-label (ms)
             let
@@ -334,12 +338,13 @@
                 replace-route! $ str |#/day/ $ day-key @*day-ms
             , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'day-after? $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn day-after? (key other)
             >
-              option:unwrap-or (key-day-number key) 0
-              option:unwrap-or (key-day-number other) 0
+                key-day-number key
+                , .unwrap-or 0
+              (key-day-number other) .unwrap-or 0
           :examples $ []
           :schema $ quote $ Fn String String (-> Bool)
         'day-key $ %{} 'CodeEntry
@@ -439,7 +444,7 @@
             if (js/Array.isArray value)
               let
                   host $ unsafe-coerce value EntryArrayHost
-                  *acc $ ref $ assert-type ([]) (List app.diary/DiaryEntry)
+                  *acc $ ref $ assert-type ([]) (List DiaryEntry)
                 host .for-each! $ fn (raw _index _array)
                   swap! *acc conj $ decode-entry raw
                   , &unit
@@ -447,7 +452,7 @@
               raise |Expected-entries-array
           :examples $ []
           :schema $ quote $ Fn JsObject
-            -> $ List app.diary/DiaryEntry
+            -> $ List DiaryEntry
             :features :js-ffi
         'decode-entry $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn decode-entry (raw)
@@ -463,7 +468,7 @@
                       contract/expect-number |created_at $ contract/object-field |entry entry |created_at
                       , :updated-at $ contract/expect-number |updated_at $ contract/object-field |entry entry |updated_at
           :examples $ []
-          :schema $ quote $ Fn JsObject (-> app.diary/DiaryEntry) (:features :js-ffi)
+          :schema $ quote $ Fn JsObject (-> DiaryEntry) (:features :js-ffi)
         'decode-strings $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn decode-strings (value)
             if (js/Array.isArray value)
@@ -484,7 +489,7 @@
             if (js/Array.isArray value)
               let
                   host $ unsafe-coerce value EntryArrayHost
-                  *acc $ ref $ assert-type ([]) (List app.diary/DaySummary)
+                  *acc $ ref $ assert-type ([]) (List DaySummary)
                 host .for-each! $ fn (raw _index _array)
                   let
                       summary $ contract/expect-object |summary raw
@@ -497,13 +502,13 @@
               raise |Expected-summaries-array
           :examples $ []
           :schema $ quote $ Fn JsObject
-            -> $ List app.diary/DaySummary
+            -> $ List DaySummary
             :features :js-ffi
         'delete-entry! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn delete-entry! (id) (hint-fn Async)
             try
               let
-                  response $ js-await $ api-request! (str |/api/entries/ id) (%:: shared/HttpMethod :delete) (Option :none)
+                  response $ js-await $ api-request! (str |/api/entries/ id) (%:: shared/HttpMethod :delete) None
                 reset! *pending-delete 0
                 if (response :ok?)
                   do
@@ -513,7 +518,7 @@
                   handle-failure! (response :status) "|删除失败"
               fn (error) (shared/console-error! |Failed-to-delete-entry) (set-status! "|删除失败" |error)
           :examples $ []
-          :schema $ quote $ Fn Number (-> Unit) (:features :js-ffi) (:async)
+          :schema $ quote $ Fn Number (-> Unit) (:features :js-ffi :state) (:async)
         'draft-key $ %{} 'CodeEntry
           :doc "|localStorage key of the unsent text of one tag on one date."
           :code $ quote $ defn draft-key (date field)
@@ -532,34 +537,35 @@
               run-queue!
             , &unit
           :examples $ []
-          :schema $ quote $ Fn (List app.diary/QueueItem) (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (List QueueItem) (-> Unit) (:features :js-ffi :state)
         'entries-of $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn entries-of (key)
             &list:filter @*entries $ fn (entry)
               = key $ :field entry
           :examples $ []
           :schema $ quote $ Fn String
-            -> $ List app.diary/DiaryEntry
+            -> $ List DiaryEntry
+            :features :state
         'field-specs $ %{} 'CodeEntry
           :doc "|Diary tags, following the record items of topixim/diary."
           :code $ quote $ def field-specs
             [] (FieldSpec :key |food :label "|食物" :hint "|吃了什么？") (FieldSpec :key |sleep :label "|睡眠" :hint "|睡得怎么样？") (FieldSpec :key |mood :label "|心情" :hint "|感觉如何？") (FieldSpec :key |place :label "|地点" :hint "|去了哪里？") (FieldSpec :key |highlight :label "|亮点" :hint "|今天的亮点？") (FieldSpec :key |met :label "|见面" :hint "|见了谁？") (FieldSpec :key |exercise :label "|运动" :hint "|做了什么运动？") (FieldSpec :key |pains :label "|病痛" :hint "|哪里不舒服？") (FieldSpec :key |text :label "|正文" :hint "|今天想记下的事，可以分几段提交。")
           :examples $ []
-          :schema $ quote $ List app.diary/FieldSpec
+          :schema $ quote $ List FieldSpec
         'fields-of-day $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn fields-of-day (key)
-            option:unwrap-or (&map:get @*days key)
-              assert-type ([]) (List String)
+            (&map:get @*days key) .unwrap-or $ assert-type ([]) (List String)
           :examples $ []
           :schema $ quote $ Fn String
             -> $ List String
+            :features :state
         'find-spec $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn find-spec (key)
             find field-specs $ fn (spec)
               = key $ :key spec
           :examples $ []
           :schema $ quote $ Fn String
-            -> $ Option app.diary/FieldSpec
+            -> $ Option FieldSpec
         'floor-mod $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn floor-mod (a b)
             - a $ * b $ floor (/ a b)
@@ -576,7 +582,7 @@
           :code $ quote $ defn group-entries (entries)
             foldl entries
               assert-type ([])
-                List $ List app.diary/DiaryEntry
+                List $ List DiaryEntry
               fn (acc entry)
                 if (empty? acc)
                   conj acc $ [] entry
@@ -595,8 +601,8 @@
                         conj group entry
                       conj acc $ [] entry
           :examples $ []
-          :schema $ quote $ Fn (List app.diary/DiaryEntry)
-            -> $ List $ List app.diary/DiaryEntry
+          :schema $ quote $ Fn (List DiaryEntry)
+            -> $ List $ List DiaryEntry
           :tests $ [] $ %{} 'TestEntry (:name |groups-close-short-values)
             :code $ quote $ let
                 item $ fn (id content at)
@@ -621,7 +627,7 @@
           :code $ quote $ defn handle-failure! (status label)
             if (= 401 status) (logout!) (set-status! label |error)
           :examples $ []
-          :schema $ quote $ Fn Number String (-> Unit)
+          :schema $ quote $ Fn Number String (-> Unit) (:features :state)
         'handle-shortcut! $ %{} 'CodeEntry
           :doc "|Desktop keys outside text fields: 1-9 open a tag, arrows step days or months, Esc closes the panel."
           :code $ quote $ defn handle-shortcut! (event)
@@ -629,10 +635,12 @@
                 key-event $ browser/keyboard-event-host event
                 key $ key-event :key
                 target $ browser/event-target-element event
-                typing? $ and (option:some? target)
-                  browser/element-matches? (option:unwrap target) "|input, textarea"
+                typing? $ and (.some? target)
+                  browser/element-matches? (.unwrap target) "|input, textarea"
                 modified? $ or (key-event :meta-key?) (key-event :ctrl-key?) (key-event :alt-key?)
-                signed-in? $ option:some? $ get-token
+                signed-in? $
+                  get-token
+                  , .some?
               when
                 and signed-in? (not typing?) (not modified?)
                 cond
@@ -642,7 +650,7 @@
                   (= key |ArrowRight) (shift-current! 1)
                   (and (= @*view |day) (= 1 (count key)))
                     let
-                        index $ option:unwrap-or (parse-digits key) 0
+                        index $ .unwrap-or (parse-digits key) 0
                       when
                         and (>= index 1)
                           <= index $ count field-specs
@@ -651,17 +659,17 @@
                   true &unit
               , &unit
           :examples $ []
-          :schema $ quote $ Fn js-ffi.browser/EventHost (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn browser/EventHost (-> Unit) (:features :js-ffi :state)
         'key->noon-ms $ %{} 'CodeEntry
           :doc "|Local noon of a date key, anchored on today so DST only moves it within the same day."
           :code $ quote $ defn key->noon-ms (key)
             let
                 today $ today-noon-ms
               + today $ * day-length $ -
-                option:unwrap-or (key-day-number key) 0
-                option:unwrap-or
-                  key-day-number $ day-key today
-                  , 0
+                  key-day-number key
+                  , .unwrap-or 0
+                (key-day-number (day-key today))
+                  , .unwrap-or 0
           :examples $ []
           :schema $ quote $ Fn String (-> Number) (:features :js-ffi)
         'key-day-number $ %{} 'CodeEntry
@@ -675,25 +683,25 @@
                   month $ parse-month $ &str:slice key 0 7
                   day $ parse-digits $ &str:slice key 8 10
                 if
-                  and (option:some? month) (option:some? day)
+                  and (.some? month) (.some? day)
                   let
-                      ym $ option:unwrap month
-                      d $ option:unwrap day
+                      ym $ month .unwrap
+                      d $ day .unwrap
                     if
                       and (>= d 1)
                         <= d $ days-in-month (:year ym) (:month ym)
-                      Option :some $ days-from-civil (:year ym) (:month ym) d
-                      Option :none
-                  Option :none
-              Option :none
+                      Some $ days-from-civil (:year ym) (:month ym) d
+                      , None
+                  , None
+              , None
           :examples $ []
           :schema $ quote $ Fn String
             -> $ Option Number
           :tests $ [] $ %{} 'TestEntry (:name |validates-calendar-dates)
             :code $ quote $ do
-              assert= true $ option:some? $ key-day-number |2024-02-29
-              assert= true $ option:none? $ key-day-number |2026-02-29
-              assert= true $ option:none? $ key-day-number |2026-1-1
+              assert= true $ .some? $ key-day-number |2024-02-29
+              assert= true $ .none? $ key-day-number |2026-02-29
+              assert= true $ .none? $ key-day-number |2026-1-1
         'load-composer! $ %{} 'CodeEntry
           :doc "|Fills the composer with the saved draft of the open tag, so long text survives switching tags, days or an expired session."
           :code $ quote $ defn load-composer! ()
@@ -702,7 +710,7 @@
                 draft-key (day-key @*day-ms) @*selected
                 , |
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'load-current! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn load-current! ()
             when (empty? @*options) (load-options!)
@@ -713,13 +721,13 @@
               true $ load-day!
             , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'load-day! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn load-day! () (hint-fn Async)
             try
               let
                   date $ day-key @*day-ms
-                  response $ js-await $ api-request! (str |/api/entries?date= date) (%:: shared/HttpMethod :get) (Option :none)
+                  response $ js-await $ api-request! (str |/api/entries?date= date) (%:: shared/HttpMethod :get) None
                 if (response :ok?)
                   let
                       result $ js-await $ shared/response-json response
@@ -730,7 +738,9 @@
                           do
                             reset! *entries $ decode-entries data
                             sync-day-summary! date
-                            show-board! $ option:unwrap-or (browser/storage-get user-key) |
+                            show-board! $
+                              browser/storage-get user-key
+                              , .unwrap-or |
                             render!
                             set-status! "|已同步" |online
                           , &unit
@@ -738,7 +748,7 @@
                   handle-failure! (response :status) "|加载失败"
               fn (error) (shared/console-error! |Failed-to-load-day) (set-status! "|连接失败" |error)
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi) (:async)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state) (:async)
         'load-month! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn load-month! ()
             let
@@ -748,13 +758,13 @@
                 , date-keys
             , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'load-options! $ %{} 'CodeEntry
           :doc "|Refreshes the value history; on failure the presets keep working. Called when the panel closes, not after each save, so options never move while they are being tapped."
           :code $ quote $ defn load-options! () (hint-fn Async)
             try
               let
-                  response $ js-await $ api-request! |/api/options (%:: shared/HttpMethod :get) (Option :none)
+                  response $ js-await $ api-request! |/api/options (%:: shared/HttpMethod :get) None
                 when (response :ok?)
                   let
                       result $ js-await $ shared/response-json response
@@ -769,13 +779,13 @@
                 , &unit
               fn (error) (shared/console-error! |Failed-to-load-options) &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi) (:async)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state) (:async)
         'load-range! $ %{} 'CodeEntry
           :doc "|Refreshes the summaries of the given dates; dates missing from the response had their records removed."
           :code $ quote $ defn load-range! (from to date-keys) (hint-fn Async)
             try
               let
-                  response $ js-await $ api-request! (str |/api/days?from= from |&to= to) (%:: shared/HttpMethod :get) (Option :none)
+                  response $ js-await $ api-request! (str |/api/days?from= from |&to= to) (%:: shared/HttpMethod :get) None
                 if (response :ok?)
                   let
                       result $ js-await $ shared/response-json response
@@ -785,14 +795,16 @@
                             cleared $ foldl date-keys @*days $ fn (acc key) (dissoc acc key)
                           reset! *days $ foldl (decode-summaries data) cleared $ fn (acc summary)
                             assoc acc (:date summary) (:fields summary)
-                          show-board! $ option:unwrap-or (browser/storage-get user-key) |
+                          show-board! $
+                            browser/storage-get user-key
+                            , .unwrap-or |
                           render!
                           set-status! "|已同步" |online
                       (:err error) (raise error)
                   handle-failure! (response :status) "|加载失败"
               fn (error) (shared/console-error! |Failed-to-load-days) (set-status! "|连接失败" |error)
           :examples $ []
-          :schema $ quote $ Fn String String (List String) (-> Unit) (:features :js-ffi) (:async)
+          :schema $ quote $ Fn String String (List String) (-> Unit) (:features :js-ffi :state) (:async)
         'load-year! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn load-year! ()
             let
@@ -803,12 +815,12 @@
                 , date-keys
             , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'local-date $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn local-date (ms)
             unsafe-coerce (shared/date-from-ms ms) LocalDateHost
           :examples $ []
-          :schema $ quote $ Fn Number (-> app.diary/LocalDateHost) (:features :js-ffi)
+          :schema $ quote $ Fn Number (-> LocalDateHost) (:features :js-ffi)
         'login! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn login! () (hint-fn Async)
             try
@@ -820,7 +832,7 @@
                 shared/headers-set! headers |Content-Type |application/json
                 let
                     request $ js-await $ shared/fetch-request (str api-base |/api/auth/login) (%:: shared/HttpMethod :post) headers
-                      Option :some $ contract/expect-string |body $ js/JSON.stringify
+                      Some $ contract/expect-string |body $ js/JSON.stringify
                         js-object (:username username) (:password password)
                   match request
                     (:ok response)
@@ -842,7 +854,7 @@
                     (:err error) (raise error)
               fn (error) (shared/console-error! |Failed-to-login) (set-status! "|登录失败" |error)
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi) (:async)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state) (:async)
         'logout! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn logout! () (browser/storage-remove! token-key) (browser/storage-remove! user-key)
             reset! *entries $ []
@@ -852,16 +864,17 @@
             apply-route! false
             show-login!
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'main! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn main! () (wire-events!) (apply-route! false)
             if
-              option:some? $ get-token
+                get-token
+                , .some?
               do (set-status! "|验证登录" |online) (load-current!)
               show-login!
             println |Diary-Lite-started
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :io :js-ffi :state)
         'merge-options $ %{} 'CodeEntry
           :doc "|Most used values first; presets only fill the remaining places, so they drop out as real usage grows."
           :code $ quote $ defn merge-options (used presets limit)
@@ -900,12 +913,12 @@
             + (:month month)
               * 12 $ :year month
           :examples $ []
-          :schema $ quote $ Fn app.diary/YearMonth (-> Number)
+          :schema $ quote $ Fn YearMonth (-> Number)
         'month-key $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn month-key (month)
             str (:year month) |- $ two-digits $ :month month
           :examples $ []
-          :schema $ quote $ Fn app.diary/YearMonth (-> String)
+          :schema $ quote $ Fn YearMonth (-> String)
         'month-keys $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn month-keys (month)
             &list:map
@@ -913,7 +926,7 @@
               fn (day)
                 str (month-key month) |- $ two-digits day
           :examples $ []
-          :schema $ quote $ Fn app.diary/YearMonth
+          :schema $ quote $ Fn YearMonth
             -> $ List String
           :tests $ [] $ %{} 'TestEntry (:name |lists-every-day)
             :code $ quote $ do
@@ -923,9 +936,10 @@
                 , 0
         'month-of-key $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn month-of-key (key)
-            option:unwrap $ parse-month $ &str:slice key 0 7
+            (parse-month (&str:slice key 0 7))
+              , .unwrap
           :examples $ []
-          :schema $ quote $ Fn String (-> app.diary/YearMonth)
+          :schema $ quote $ Fn String (-> YearMonth)
         'navigate! $ %{} 'CodeEntry
           :doc "|Adds a history entry so the phone's back gesture walks through pages."
           :code $ quote $ defn navigate! (hash)
@@ -935,13 +949,13 @@
               apply-route! true
             , &unit
           :examples $ []
-          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi :state)
         'open-day! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn open-day! (key field)
             reset! *sheet-pushed $ not= field |
             navigate! $ if (= field |) (str |#/day/ key) (str |#/day/ key |/ field)
           :examples $ []
-          :schema $ quote $ Fn String String (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn String String (-> Unit) (:features :js-ffi :state)
         'option-on? $ %{} 'CodeEntry
           :doc "|Displayed state: what is saved, flipped once for every change still in the queue."
           :code $ quote $ defn option-on? (key value)
@@ -962,7 +976,7 @@
                 not saved?
                 , saved?
           :examples $ []
-          :schema $ quote $ Fn String String (-> Bool) (:features :js-ffi)
+          :schema $ quote $ Fn String String (-> Bool) (:features :js-ffi :state)
         'parse-digits $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn parse-digits (text)
             match (parse-float text)
@@ -970,9 +984,9 @@
                 if
                   and (>= value 0)
                     = value $ floor value
-                  Option :some value
-                  Option :none
-              (:err _message) (Option :none)
+                  Some value
+                  , None
+              (:err _message) None
           :examples $ []
           :schema $ quote $ Fn String
             -> $ Option Number
@@ -986,24 +1000,24 @@
                   year $ parse-digits $ &str:slice text 0 4
                   month $ parse-digits $ &str:slice text 5 7
                 if
-                  and (option:some? year) (option:some? month)
+                  and (.some? year) (.some? month)
                   let
-                      y $ option:unwrap year
-                      m $ option:unwrap month
+                      y $ year .unwrap
+                      m $ month .unwrap
                     if
                       and (>= y 1) (>= m 1) (<= m 12)
-                      Option :some $ YearMonth :year y :month m
-                      Option :none
-                  Option :none
-              Option :none
+                      Some $ YearMonth :year y :month m
+                      , None
+                  , None
+              , None
           :examples $ []
           :schema $ quote $ Fn String
-            -> $ Option app.diary/YearMonth
+            -> $ Option YearMonth
           :tests $ [] $ %{} 'TestEntry (:name |rejects-invalid-months)
             :code $ quote $ do
-              assert= 11 $ :month $ option:unwrap (parse-month |2026-11)
-              assert= true $ option:none? $ parse-month |2026-13
-              assert= true $ option:none? $ parse-month |nonsense
+              assert= 11 $ :month $ .unwrap (parse-month |2026-11)
+              assert= true $ .none? $ parse-month |2026-13
+              assert= true $ .none? $ parse-month |nonsense
         'parse-route $ %{} 'CodeEntry
           :doc "|Decodes the location hash. Unknown or future targets fall back to today so a stale link still opens."
           :code $ quote $ defn parse-route (hash today)
@@ -1016,21 +1030,22 @@
                   = segment |calendar
                   let
                       parsed $ parse-month target
-                    Route :view |calendar :day | :field | :month $ if (option:some? parsed) (option:unwrap parsed) this-month
+                    Route :view |calendar :day | :field | :month $ if (parsed .some?) (parsed .unwrap) this-month
                 (= segment |me)
                   Route :view |me :day | :field | :month this-month
                 true $ let
                     valid? $ and
-                      option:some? $ key-day-number target
+                      .some? $ key-day-number target
                       not $ day-after? target today
                     field $ part-at parts 3
                   Route :view |day :day (if valid? target today) :field
                     if
-                      option:some? $ find-spec field
+                        find-spec field
+                        , .some?
                       , field |
                     , :month this-month
           :examples $ []
-          :schema $ quote $ Fn String String (-> app.diary/Route)
+          :schema $ quote $ Fn String String (-> Route)
           :tests $ [] $ %{} 'TestEntry (:name |decodes-navigation-targets)
             :code $ quote $ do
               assert= |2026-11-08 $ :day $ parse-route | |2026-11-08
@@ -1073,8 +1088,9 @@
           :doc "|Suggestions from usage and presets; values recorded on this day always stay visible so they can be toggled off."
           :code $ quote $ defn quick-options (key)
             let
-                used $ option:unwrap-or (&map:get @*options key)
-                  assert-type ([]) (List String)
+                used $
+                  &map:get @*options key
+                  , .unwrap-or $ assert-type ([]) (List String)
                 suggested $ merge-options used (preset-options key) quick-option-limit
                 recorded $ &list:filter
                   &list:map (entries-of key)
@@ -1084,25 +1100,27 @@
           :examples $ []
           :schema $ quote $ Fn String
             -> $ List String
+            :features :state
         'refresh-if-active! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn refresh-if-active! ()
             when
-              option:some? $ get-token
+              .some? $ get-token
               match (browser/visibility-state)
                 (:visible) (load-current!)
                 _ &unit
             , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'reload! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn reload! () (render!)
             if
-              option:some? $ get-token
+                get-token
+                , .some?
               load-current!
               show-login!
             println |Diary-Lite-reloaded
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :io :js-ffi :state)
         'render! $ %{} 'CodeEntry (:doc "|Draws the active page and marks the active tab.")
           :code $ quote $ defn render! ()
             each ([] |day |calendar |me)
@@ -1131,7 +1149,7 @@
             reset! *pop-field |
             , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'render-cal-day $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn render-cal-day (key today)
             let
@@ -1153,9 +1171,9 @@
                 true $ str "|已记录" recorded "|项，缺" (- total recorded) "|项"
               when future? $ set-disabled! cell true
               browser/element-set-class-name! number |cal-num
-              browser/element-set-text-content! number $ str $ option:unwrap-or
+              browser/element-set-text-content! number $ str $
                 parse-digits $ &str:slice key 8 10
-                , 0
+                , .unwrap-or 0
               browser/element-set-class-name! dots |cal-dots
               each field-specs $ fn (spec)
                 let
@@ -1175,7 +1193,7 @@
                   , &unit
               , cell
           :examples $ []
-          :schema $ quote $ Fn String String (-> js-ffi.browser/DomElementHost) (:features :js-ffi)
+          :schema $ quote $ Fn String String (-> browser/DomElementHost) (:features :js-ffi :state)
         'render-cal-panel! $ %{} 'CodeEntry
           :doc "|Details of the inspected date: which tags exist and which are missing, each one jumping straight to that record."
           :code $ quote $ defn render-cal-panel! (today)
@@ -1214,7 +1232,7 @@
                     , &unit
               , &unit
           :examples $ []
-          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi :state)
         'render-calendar! $ %{} 'CodeEntry
           :doc "|Month grid: every date shows whether it is complete, partial or unwritten, with one dot per tag."
           :code $ quote $ defn render-calendar! ()
@@ -1253,7 +1271,7 @@
                 , &unit
               render-cal-panel! today
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'render-day! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn render-day! ()
             browser/element-set-text-content! (by-id |#day-title) (day-title @*day-ms)
@@ -1269,19 +1287,19 @@
                 day-key @*day-ms
             render-tags!
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'render-detail! $ %{} 'CodeEntry
           :doc "|Slides the record sheet in and out; its content stays in place while it slides away."
           :code $ quote $ defn render-detail! ()
             let
                 spec-opt $ find-spec @*selected
-                open? $ option:some? spec-opt
+                open? $ spec-opt .some?
                 detail $ by-id |#detail
               set-class! detail |open open?
               set-class! (by-id |#sheet-backdrop) |open open?
               if open? (browser/element-remove-attribute! detail |inert) (browser/element-set-attribute! detail |inert |)
               when open? $ let
-                  spec $ option:unwrap spec-opt
+                  spec $ .unwrap spec-opt
                   entries $ entries-of $ :key spec
                   list-node $ by-id |#entry-list
                   editing @*editing
@@ -1325,7 +1343,7 @@
                       , &unit
               , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'render-entry $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn render-entry (entry)
             let
@@ -1365,7 +1383,7 @@
               browser/append-child! card actions
               , card
           :examples $ []
-          :schema $ quote $ Fn app.diary/DiaryEntry (-> js-ffi.browser/DomElementHost) (:features :js-ffi)
+          :schema $ quote $ Fn DiaryEntry (-> browser/DomElementHost) (:features :js-ffi :state)
         'render-entry-group $ %{} 'CodeEntry
           :doc "|One row for several values: a shared time span, and each value can still be edited or removed on its own."
           :code $ quote $ defn render-entry-group (group fresh?)
@@ -1400,7 +1418,7 @@
               browser/append-child! card actions
               , card
           :examples $ []
-          :schema $ quote $ Fn (List app.diary/DiaryEntry) Bool (-> js-ffi.browser/DomElementHost) (:features :js-ffi)
+          :schema $ quote $ Fn (List DiaryEntry) Bool (-> browser/DomElementHost) (:features :js-ffi :state)
         'render-group-value $ %{} 'CodeEntry
           :doc "|A value inside a merged row: tap the text to edit, the cross to delete after confirming."
           :code $ quote $ defn render-group-value (entry fresh?)
@@ -1442,7 +1460,7 @@
               browser/append-child! pill remove-button
               , pill
           :examples $ []
-          :schema $ quote $ Fn app.diary/DiaryEntry Bool (-> js-ffi.browser/DomElementHost) (:features :js-ffi)
+          :schema $ quote $ Fn DiaryEntry Bool (-> browser/DomElementHost) (:features :js-ffi :state)
         'render-me! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn render-me! ()
             let
@@ -1466,7 +1484,7 @@
               browser/element-set-text-content! (by-id |#stat-complete)
                 str $ count complete
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'render-quick-chips! $ %{} 'CodeEntry
           :doc "|Quick options of a tag field; keeps keyboard focus on the same option across redraws."
           :code $ quote $ defn render-quick-chips! (key)
@@ -1474,10 +1492,9 @@
                 container $ by-id |#quick-chips
                 tagged? $ tag-field? key
                 active $ browser/document-active-element
-                focused $ if (option:some? active)
-                  option:unwrap-or
-                    browser/element-data-get (option:unwrap active) |value
-                    , |
+                focused $ if (active .some?)
+                  (browser/element-data-get (active .unwrap) |value)
+                    , .unwrap-or |
                   , |
               browser/element-set-hidden! container $ not tagged?
               browser/element-set-inner-html! container |
@@ -1497,7 +1514,7 @@
                     , &unit
               , &unit
           :examples $ []
-          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi :state)
         'render-tags! $ %{} 'CodeEntry
           :doc "|Big tags: recorded tags are colored with their count and latest content, unrecorded ones stay gray."
           :code $ quote $ defn render-tags! ()
@@ -1535,10 +1552,10 @@
                       join-string
                         &list:map entries $ fn (entry) (:content entry)
                         , "|、"
-                    true $ option:unwrap-or
-                      option:map (&list:last entries)
-                        fn (entry) (:content entry)
-                      , |
+                    true $
+                        &list:last entries
+                        , .map $ fn (entry) (:content entry)
+                      , .unwrap-or |
                   browser/element-add-event-listener! tile |click $ fn (_event)
                     tap-guard! $ fn () $ if (= key @*selected) (close-detail!) (select-field! key)
                   browser/append-child! tile label
@@ -1547,17 +1564,17 @@
                   browser/append-child! container tile
                   , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'replace-route! $ %{} 'CodeEntry
           :doc "|Moves within a page without growing history, used for stepping days and months."
           :code $ quote $ defn replace-route! (hash) (browser/history-replace-state! hash) (apply-route! true)
           :examples $ []
-          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi :state)
         'replay-class! $ %{} 'CodeEntry
           :doc "|Restarts a CSS animation class; reading scrollHeight forces the reflow that makes the removal take effect."
           :code $ quote $ defn replay-class! (element class-name) (browser/element-class-remove! element class-name) (browser/element-scroll-height element) (browser/element-class-add! element class-name)
           :examples $ []
-          :schema $ quote $ Fn js-ffi.browser/DomElementHost String (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn browser/DomElementHost String (-> Unit) (:features :js-ffi)
         'restore-unsaved! $ %{} 'CodeEntry
           :doc "|Puts values that could not be saved back into their drafts, so nothing typed or tapped is lost."
           :code $ quote $ defn restore-unsaved! (items)
@@ -1572,7 +1589,7 @@
             when (= @*editing 0) (load-composer!)
             , &unit
           :examples $ []
-          :schema $ quote $ Fn (List app.diary/QueueItem) (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (List QueueItem) (-> Unit) (:features :js-ffi :state)
         'run-queue! $ %{} 'CodeEntry
           :doc "|Applies queued changes in order, reloading after each so removals see fresh entries; stops at the first failure."
           :code $ quote $ defn run-queue! () (hint-fn Async)
@@ -1588,13 +1605,13 @@
                     , &unit
                   let
                       unsaved @*queue
-                    reset! *queue $ assert-type ([]) (List app.diary/QueueItem)
+                    reset! *queue $ assert-type ([]) (List QueueItem)
                     reset! *queue-running false
                     restore-unsaved! unsaved
                     render!
                     , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi) (:async)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state) (:async)
         'save-draft! $ %{} 'CodeEntry
           :doc "|Stores composer text on every input; text of an entry being edited is not a draft."
           :code $ quote $ defn save-draft! ()
@@ -1606,7 +1623,7 @@
                 if (= text |) (browser/storage-remove! key) (browser/storage-set! key text)
             , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'select-field! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn select-field! (key)
             let
@@ -1615,17 +1632,17 @@
                 do (reset! *sheet-pushed true) (navigate! hash)
                 replace-route! hash
           :examples $ []
-          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn String (-> Unit) (:features :js-ffi :state)
         'set-class! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn set-class! (element class-name on?)
             if on? (browser/element-class-add! element class-name) (browser/element-class-remove! element class-name)
           :examples $ []
-          :schema $ quote $ Fn js-ffi.browser/DomElementHost String Bool (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn browser/DomElementHost String Bool (-> Unit) (:features :js-ffi)
         'set-disabled! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn set-disabled! (element disabled?)
             if disabled? (browser/element-set-attribute! element |disabled |) (browser/element-remove-attribute! element |disabled)
           :examples $ []
-          :schema $ quote $ Fn js-ffi.browser/DomElementHost Bool (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn browser/DomElementHost Bool (-> Unit) (:features :js-ffi)
         'set-status! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn set-status! (label state)
             let
@@ -1643,7 +1660,7 @@
               true &unit
             , &unit
           :examples $ []
-          :schema $ quote $ Fn Number (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn Number (-> Unit) (:features :js-ffi :state)
         'shift-day! $ %{} 'CodeEntry
           :doc "|Steps the visible day; 0 means today and days after today are ignored."
           :code $ quote $ defn shift-day! (days)
@@ -1658,7 +1675,7 @@
                     if (= @*selected |) | $ str |/ @*selected
               , &unit
           :examples $ []
-          :schema $ quote $ Fn Number (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn Number (-> Unit) (:features :js-ffi :state)
         'shift-month! $ %{} 'CodeEntry
           :doc "|Steps the calendar; 0 means this month and later months are ignored."
           :code $ quote $ defn shift-month! (delta)
@@ -1670,7 +1687,7 @@
                 replace-route! $ str |#/calendar/ $ month-key target
               , &unit
           :examples $ []
-          :schema $ quote $ Fn Number (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn Number (-> Unit) (:features :js-ffi :state)
         'short-value? $ %{} 'CodeEntry
           :doc "|Whether a recorded text can appear as a quick option; mirrors the backend rule."
           :code $ quote $ defn short-value? (content)
@@ -1718,11 +1735,11 @@
               render!
               browser/element-focus! input
           :examples $ []
-          :schema $ quote $ Fn app.diary/DiaryEntry (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn DiaryEntry (-> Unit) (:features :js-ffi :state)
         'store-renewed-token! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn store-renewed-token! (token)
-            when (option:some? token)
-              browser/storage-set! token-key $ option:unwrap token
+            when (.some? token)
+              browser/storage-set! token-key $ .unwrap token
             , &unit
           :examples $ []
           :schema $ quote $ Fn (Option String) (-> Unit) (:features :js-ffi)
@@ -1733,7 +1750,7 @@
               empty? $ fields-of-day $ day-key ms
               , acc $ recur (- ms day-length) (+ acc 1)
           :examples $ []
-          :schema $ quote $ Fn Number Number (-> Number) (:features :js-ffi)
+          :schema $ quote $ Fn Number Number (-> Number) (:features :js-ffi :state)
         'submit-entry! $ %{} 'CodeEntry
           :doc "|Tag fields split the text into separate values; other fields save it whole. Editing replaces the entry with the first value."
           :code $ quote $ defn submit-entry! () (hint-fn Async)
@@ -1760,10 +1777,10 @@
                       let
                           response $ js-await $ if (= editing 0)
                             api-request! |/api/entries (%:: shared/HttpMethod :post)
-                              Option :some $ contract/expect-string |body $ js/JSON.stringify
+                              Some $ contract/expect-string |body $ js/JSON.stringify
                                 js-object (:date date) (:field field) (:content content)
                             api-request! (str |/api/entries/ editing) (%:: shared/HttpMethod :put)
-                              Option :some $ contract/expect-string |body $ js/JSON.stringify
+                              Some $ contract/expect-string |body $ js/JSON.stringify
                                 js-object $ :content content
                         if (response :ok?)
                           do
@@ -1787,7 +1804,7 @@
                 if @*touch? (browser/element-blur! input) (browser/element-focus! input)
               , &unit
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi) (:async)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state) (:async)
         'submit-tokens! $ %{} 'CodeEntry
           :doc "|Saves typed values of a tag field as separate entries, skipping ones already recorded."
           :code $ quote $ defn submit-tokens! (tokens field date)
@@ -1799,7 +1816,7 @@
               fn (token)
                 QueueItem :date date :field field :value token :add? true
           :examples $ []
-          :schema $ quote $ Fn (List String) String String (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (List String) String String (-> Unit) (:features :js-ffi :state)
         'sync-day-summary! $ %{} 'CodeEntry
           :doc "|Keeps the calendar in step with the entries just loaded for one date."
           :code $ quote $ defn sync-day-summary! (date)
@@ -1811,7 +1828,7 @@
               reset! *days $ if (empty? fields) (dissoc @*days date) (assoc @*days date fields)
               , &unit
           :examples $ []
-          :schema $ quote $ Fn String (-> Unit)
+          :schema $ quote $ Fn String (-> Unit) (:features :state)
         'sync-selected! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn sync-selected! (field day-changed?)
             when
@@ -1823,11 +1840,11 @@
             when (= field |) (reset! *sheet-pushed false)
             when
               and (= field |)
-                option:some? $ get-token
+                .some? $ get-token
               load-options!
             , &unit
           :examples $ []
-          :schema $ quote $ Fn String Bool (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn String Bool (-> Unit) (:features :js-ffi :state)
         'tag-field? $ %{} 'CodeEntry
           :doc "|Tags holding enumerable values; the others stay free text."
           :code $ quote $ defn tag-field? (key)
@@ -1849,6 +1866,7 @@
           :schema $ quote $ Fn
             Fn $ -> Unit
             -> Unit
+            :features :state
         'today-noon-ms $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn today-noon-ms ()
             let
@@ -1865,7 +1883,7 @@
             enqueue! $ [] $ QueueItem :date (day-key @*day-ms) :field key :value value :add?
               not $ option-on? key value
           :examples $ []
-          :schema $ quote $ Fn String String (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn String String (-> Unit) (:features :js-ffi :state)
         'token-key $ %{} 'CodeEntry (:doc |)
           :code $ quote $ def token-key |diary-lite-token
           :examples $ []
@@ -1955,7 +1973,7 @@
             browser/document-add-event-listener! |visibilitychange $ fn (_event) (refresh-if-active!)
             browser/add-event-listener! |online $ fn (_event) (refresh-if-active!)
           :examples $ []
-          :schema $ quote $ Fn (-> Unit) (:features :js-ffi)
+          :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'wire-swipe! $ %{} 'CodeEntry
           :doc "|Horizontal finger swipes step days or months; vertical movement stays with page scrolling through touch-action."
           :code $ quote $ defn wire-swipe! (element on-next on-prev)
@@ -1981,11 +1999,11 @@
                   if (< dx 0) (on-next) (on-prev)
                 , &unit
           :examples $ []
-          :schema $ quote $ Fn js-ffi.browser/DomElementHost
+          :schema $ quote $ Fn browser/DomElementHost
             Fn $ -> Unit
             Fn $ -> Unit
             -> Unit
-            :features :js-ffi
+            :features :js-ffi :state
         'year-keys $ %{} 'CodeEntry (:doc "|The latest 365 local dates, newest first.")
           :code $ quote $ defn year-keys ()
             let
