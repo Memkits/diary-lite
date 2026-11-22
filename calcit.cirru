@@ -104,9 +104,9 @@
           :examples $ []
           :schema $ quote $ Ref Bool
         '*view $ %{} 'CodeEntry (:doc "|Active page: day, calendar or me.")
-          :code $ quote $ defref *view |day
+          :code $ quote $ defref *view (View :day)
           :examples $ []
-          :schema $ quote $ Ref String
+          :schema $ quote $ Ref View
         'DaySummary $ %{} 'CodeEntry (:doc "|Tags recorded on one date, from /api/days.")
           :code $ quote $ defstruct DaySummary (:date String)
             :fields $ List String
@@ -151,9 +151,13 @@
           :schema $ quote StructDef
         'Route $ %{} 'CodeEntry
           :doc "|Decoded location hash; the hash is the single source of truth for navigation."
-          :code $ quote $ defstruct Route (:view String) (:day String) (:field String) (:month app.diary/YearMonth)
+          :code $ quote $ defstruct Route (:view View) (:day String) (:field String) (:month app.diary/YearMonth)
           :examples $ []
           :schema $ quote StructDef
+        'View $ %{} 'CodeEntry (:doc "|The active diary page.")
+          :code $ quote $ defenum View (:day) (:calendar) (:me)
+          :examples $ []
+          :schema $ quote EnumDef
         'YearMonth $ %{} 'CodeEntry (:doc "|A calendar month with a 1-based month number.")
           :code $ quote $ defstruct YearMonth (:year Number) (:month Number)
           :examples $ []
@@ -253,9 +257,12 @@
                 prev-month $ month-key @*month
                 prev-index $ month-index @*month
                 next-day $ :day route
-                day-changed? $ and (= view |day) (not= next-day prev-day)
+                day-changed? $ and
+                  = view $ View :day
+                  not= next-day prev-day
                 field-changed? $ not= @*selected $ :field route
-                month-changed? $ and (= view |calendar)
+                month-changed? $ and
+                  = view $ View :calendar
                   not= prev-month $ month-key $ :month route
               reset! *view view
               when day-changed?
@@ -648,7 +655,7 @@
                     close-detail!
                   (= key |ArrowLeft) (shift-current! -1)
                   (= key |ArrowRight) (shift-current! 1)
-                  (and (= @*view |day) (= 1 (count key)))
+                  (and (= @*view (View :day)) (= 1 (count key)))
                     let
                         index $ .unwrap-or (parse-digits key) 0
                       when
@@ -715,9 +722,10 @@
           :code $ quote $ defn load-current! ()
             when (empty? @*options) (load-options!)
             cond
-                = @*view |calendar
+                = @*view $ View :calendar
                 load-month!
-              (= @*view |me) (load-year!)
+              (= @*view (View :me))
+                load-year!
               true $ load-day!
             , &unit
           :examples $ []
@@ -1030,15 +1038,15 @@
                   = segment |calendar
                   let
                       parsed $ parse-month target
-                    Route :view |calendar :day | :field | :month $ if (parsed .some?) (parsed .unwrap) this-month
+                    Route :view (View :calendar) :day | :field | :month $ if (parsed .some?) (parsed .unwrap) this-month
                 (= segment |me)
-                  Route :view |me :day | :field | :month this-month
+                  Route :view (View :me) :day | :field | :month this-month
                 true $ let
                     valid? $ and
                       .some? $ key-day-number target
                       not $ day-after? target today
                     field $ part-at parts 3
-                  Route :view |day :day (if valid? target today) :field
+                  Route :view (View :day) :day (if valid? target today) :field
                     if
                         find-spec field
                         , .some?
@@ -1053,9 +1061,11 @@
               assert= |food $ :field $ parse-route |#/day/2026-11-07/food |2026-11-08
               assert= | $ :field $ parse-route |#/day/2026-11-07/nope |2026-11-08
               assert= |2026-11-08 $ :day $ parse-route |#/day/2027-01-01 |2026-11-08
-              assert= |calendar $ :view $ parse-route |#/calendar/2026-02 |2026-11-08
+              assert= (View :calendar)
+                :view $ parse-route |#/calendar/2026-02 |2026-11-08
               assert= 2 $ :month $ :month (parse-route |#/calendar/2026-02 |2026-11-08)
-              assert= |me $ :view $ parse-route |#/me |2026-11-08
+              assert= (View :me)
+                :view $ parse-route |#/me |2026-11-08
         'part-at $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn part-at (parts index)
             if
@@ -1126,7 +1136,7 @@
             each ([] |day |calendar |me)
               fn (view)
                 let
-                    active? $ = view @*view
+                    active? $ = view $ view-name @*view
                   browser/element-set-hidden!
                     by-id $ str |#view- view
                     not active?
@@ -1141,9 +1151,10 @@
                       by-id $ str |#tab- view
                       , |aria-current
             cond
-                = @*view |calendar
+                = @*view $ View :calendar
                 render-calendar!
-              (= @*view |me) (render-me!)
+              (= @*view (View :me))
+                render-me!
               true $ render-day!
             render-detail!
             reset! *pop-field |
@@ -1654,9 +1665,10 @@
         'shift-current! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn shift-current! (delta)
             cond
-                = @*view |day
+                = @*view $ View :day
                 shift-day! delta
-              (= @*view |calendar) (shift-month! delta)
+              (= @*view (View :calendar))
+                shift-month! delta
               true &unit
             , &unit
           :examples $ []
@@ -1897,6 +1909,20 @@
           :code $ quote $ def user-key |diary-lite-user
           :examples $ []
           :schema $ quote String
+        'view-name $ %{} 'CodeEntry (:doc "|DOM suffix for a diary page.")
+          :code $ quote $ defn view-name (view)
+            match view
+              (:day) |day
+              (:calendar) |calendar
+              (:me) |me
+          :examples $ []
+          :schema $ quote $ Fn View (-> String)
+          :tests $ [] $ %{} 'TestEntry (:name |preserves-dom-page-ids)
+            :code $ quote $ do
+              assert= |day $ view-name $ View :day
+              assert= |calendar $ view-name $ View :calendar
+              assert= |me $ view-name $ View :me
+            :tags $ #{} :unit
         'wire-events! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn wire-events! ()
             browser/element-add-event-listener! (by-id |#login-form) |submit $ fn (event) (event .prevent-default!) (login!) &unit
@@ -1951,7 +1977,9 @@
             browser/element-add-event-listener! (by-id |#this-month) |click $ fn (_event) (shift-month! 0)
             browser/element-add-event-listener! (by-id |#cal-open-day) |click $ fn (_event) (open-day! @*cal-selected |)
             browser/element-add-event-listener! (by-id |#tab-day) |click $ fn (_event)
-              if (= @*view |day) (shift-day! 0)
+              if
+                = @*view $ View :day
+                shift-day! 0
                 navigate! $ str |#/day/ $ day-key @*day-ms
             browser/element-add-event-listener! (by-id |#tab-calendar) |click $ fn (_event)
               navigate! $ str |#/calendar/ $ month-key @*month
