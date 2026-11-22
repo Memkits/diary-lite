@@ -61,10 +61,10 @@ jobs:
           caps --ci
           yarn install --immutable
           caps verify --toolchain
-          test "$(calcit --version)" = "0.42.1"
+          test "$(calcit --version)" = "0.44.0"
           yarn check
           if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            asset_prefix="${GITHUB_REPOSITORY}/pr/"
+            asset_prefix="${GITHUB_REPOSITORY}/pr/${{ github.event.pull_request.number }}/"
           elif [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
             asset_prefix="${GITHUB_REPOSITORY}/"
           else
