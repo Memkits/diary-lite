@@ -40,7 +40,7 @@ yarn compile
 yarn dev
 ```
 
-前端使用 Calcit 0.44.0 与 `calcit-lang/js-ffi` 0.2.19；代码在 `calcit.cirru` 的 `app.diary` 命名空间，只通过 `calcit edit` / `calcit tree` 修改。
+前端使用 Calcit 0.45.0 与 `calcit-lang/js-ffi` 0.2.19；代码在 `calcit.cirru` 的 `app.diary` 命名空间，只通过 `calcit edit` / `calcit tree` 修改。
 
 ## 后端 API
 

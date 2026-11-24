@@ -44,16 +44,16 @@ jobs:
           corepack enable
           corepack prepare yarn@4.18.0 --activate
           yarn --version
-      - uses: calcit-lang/setup-calcit@ca701be5a471759e442aa053cd100720bbe1f09f # v1.5.0
+      - uses: calcit-lang/setup-calcit@aab12ef8046e89eeb59e1b1d78b3b84c5fde903d # v1.5.2
         with:
           tools: calcit,caps
-          caps-version: "0.1.1"
+          caps-version: "0.1.2"
       - name: Check and build frontend
         run: |
           caps --ci
           yarn install --immutable
           caps verify --toolchain
-          test "$(calcit --version)" = "0.44.0"
+          test "$(calcit --version)" = "0.45.0"
           calcit edit format
           git diff --exit-code -- calcit.cirru
           calcit fix --workflow strict --verify --format edn

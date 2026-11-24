@@ -448,7 +448,8 @@
         'decode-entries $ %{} 'CodeEntry
           :doc "|Checks every field of the fetched JSON array and copies it into DiaryEntry values."
           :code $ quote $ defn decode-entries (value)
-            if (js/Array.isArray value)
+            if
+              contract/expect-bool |Array.isArray $ js/Array.isArray value
               let
                   host $ unsafe-coerce value EntryArrayHost
                   *acc $ ref $ assert-type ([]) (List DiaryEntry)
@@ -478,7 +479,8 @@
           :schema $ quote $ Fn JsObject (-> DiaryEntry) (:features :js-ffi)
         'decode-strings $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn decode-strings (value)
-            if (js/Array.isArray value)
+            if
+              contract/expect-bool |Array.isArray $ js/Array.isArray value
               let
                   host $ unsafe-coerce value EntryArrayHost
                   *acc $ ref $ assert-type ([]) (List String)
@@ -493,7 +495,8 @@
             :features :js-ffi
         'decode-summaries $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn decode-summaries (value)
-            if (js/Array.isArray value)
+            if
+              contract/expect-bool |Array.isArray $ js/Array.isArray value
               let
                   host $ unsafe-coerce value EntryArrayHost
                   *acc $ ref $ assert-type ([]) (List DaySummary)
