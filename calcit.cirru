@@ -953,10 +953,10 @@
           :schema $ quote $ Fn String (-> YearMonth)
         'navigate! $ %{} 'CodeEntry
           :doc "|Adds a history entry so the phone's back gesture walks through pages."
-          :code $ quote $ defn navigate! (hash)
+          :code $ quote $ defn navigate! (route-hash)
             when
-              not= hash $ :hash $ browser/location-snapshot
-              browser/history-push-state! hash
+              not= route-hash $ :hash $ browser/location-snapshot
+              browser/history-push-state! route-hash
               apply-route! true
             , &unit
           :examples $ []
@@ -1031,9 +1031,9 @@
               assert= true $ .none? $ parse-month |nonsense
         'parse-route $ %{} 'CodeEntry
           :doc "|Decodes the location hash. Unknown or future targets fall back to today so a stale link still opens."
-          :code $ quote $ defn parse-route (hash today)
+          :code $ quote $ defn parse-route (route-hash today)
             let
-                parts $ split hash |/
+                parts $ split route-hash |/
                 segment $ part-at parts 1
                 target $ part-at parts 2
                 this-month $ month-of-key today
@@ -1259,6 +1259,7 @@
                   not $ day-after? key today
                 total $ count field-specs
                 state-count $ fn (state)
+                  hint-fn $ Fn String $ -> Number
                   count $ &list:filter past-keys $ fn (key)
                     = state $ day-state
                       count $ fields-of-day key
@@ -1581,7 +1582,7 @@
           :schema $ quote $ Fn (-> Unit) (:features :js-ffi :state)
         'replace-route! $ %{} 'CodeEntry
           :doc "|Moves within a page without growing history, used for stepping days and months."
-          :code $ quote $ defn replace-route! (hash) (browser/history-replace-state! hash) (apply-route! true)
+          :code $ quote $ defn replace-route! (route-hash) (browser/history-replace-state! route-hash) (apply-route! true)
           :examples $ []
           :schema $ quote $ Fn String (-> Unit) (:features :js-ffi :state)
         'replay-class! $ %{} 'CodeEntry
@@ -1641,10 +1642,10 @@
         'select-field! $ %{} 'CodeEntry (:doc |)
           :code $ quote $ defn select-field! (key)
             let
-                hash $ str |#/day/ (day-key @*day-ms) |/ key
+                route-hash $ str |#/day/ (day-key @*day-ms) |/ key
               if (= @*selected |)
-                do (reset! *sheet-pushed true) (navigate! hash)
-                replace-route! hash
+                do (reset! *sheet-pushed true) (navigate! route-hash)
+                replace-route! route-hash
           :examples $ []
           :schema $ quote $ Fn String (-> Unit) (:features :js-ffi :state)
         'set-class! $ %{} 'CodeEntry (:doc |)
