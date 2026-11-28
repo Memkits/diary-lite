@@ -212,7 +212,7 @@
             try
               if (:add? item)
                 let
-                    response $ js-await $ api-request! |/api/entries (%:: shared/HttpMethod :post)
+                    response $ js-await $ api-request! |/api/entries (shared/HttpMethod :post)
                       Some $ contract/expect-string |body $ js/JSON.stringify
                         js-object
                           :date $ :date item
@@ -235,7 +235,7 @@
                   if (empty? matches) true $ let
                       response $ js-await $ api-request!
                         str |/api/entries/ $ :id $ &list:nth matches 0
-                        %:: shared/HttpMethod :delete
+                        shared/HttpMethod :delete
                         , None
                     when
                       not $ response :ok?
@@ -518,7 +518,7 @@
           :code $ quote $ defn delete-entry! (id) (hint-fn Async)
             try
               let
-                  response $ js-await $ api-request! (str |/api/entries/ id) (%:: shared/HttpMethod :delete) None
+                  response $ js-await $ api-request! (str |/api/entries/ id) (shared/HttpMethod :delete) None
                 reset! *pending-delete 0
                 if (response :ok?)
                   do
@@ -738,7 +738,7 @@
             try
               let
                   date $ day-key @*day-ms
-                  response $ js-await $ api-request! (str |/api/entries?date= date) (%:: shared/HttpMethod :get) None
+                  response $ js-await $ api-request! (str |/api/entries?date= date) (shared/HttpMethod :get) None
                 if (response :ok?)
                   let
                       result $ js-await $ shared/response-json response
@@ -775,7 +775,7 @@
           :code $ quote $ defn load-options! () (hint-fn Async)
             try
               let
-                  response $ js-await $ api-request! |/api/options (%:: shared/HttpMethod :get) None
+                  response $ js-await $ api-request! |/api/options (shared/HttpMethod :get) None
                 when (response :ok?)
                   let
                       result $ js-await $ shared/response-json response
@@ -796,7 +796,7 @@
           :code $ quote $ defn load-range! (from to date-keys) (hint-fn Async)
             try
               let
-                  response $ js-await $ api-request! (str |/api/days?from= from |&to= to) (%:: shared/HttpMethod :get) None
+                  response $ js-await $ api-request! (str |/api/days?from= from |&to= to) (shared/HttpMethod :get) None
                 if (response :ok?)
                   let
                       result $ js-await $ shared/response-json response
@@ -842,7 +842,7 @@
                   headers $ shared/headers-create
                 shared/headers-set! headers |Content-Type |application/json
                 let
-                    request $ js-await $ shared/fetch-request (str api-base |/api/auth/login) (%:: shared/HttpMethod :post) headers
+                    request $ js-await $ shared/fetch-request (str api-base |/api/auth/login) (shared/HttpMethod :post) headers
                       Some $ contract/expect-string |body $ js/JSON.stringify
                         js-object (:username username) (:password password)
                   match request
@@ -1792,10 +1792,10 @@
                     try
                       let
                           response $ js-await $ if (= editing 0)
-                            api-request! |/api/entries (%:: shared/HttpMethod :post)
+                            api-request! |/api/entries (shared/HttpMethod :post)
                               Some $ contract/expect-string |body $ js/JSON.stringify
                                 js-object (:date date) (:field field) (:content content)
-                            api-request! (str |/api/entries/ editing) (%:: shared/HttpMethod :put)
+                            api-request! (str |/api/entries/ editing) (shared/HttpMethod :put)
                               Some $ contract/expect-string |body $ js/JSON.stringify
                                 js-object $ :content content
                         if (response :ok?)

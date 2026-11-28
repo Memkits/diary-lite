@@ -10,7 +10,7 @@
     "build": "vite build"
   },
   "devDependencies": {
-    "@calcit/procs": "0.46.0",
+    "@calcit/procs": "0.47.1",
     "vite": "6.1.0"
   }
 }
